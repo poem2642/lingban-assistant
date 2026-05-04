@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/background"
+    android:paddingTop="50dp"
+    android:paddingBottom="30dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <!-- 这里模仿几条对话，方便你预览效果 -->
+        <include layout="@layout/item_message_user" />
+        <include layout="@layout/item_message_bot" />
+        <include layout="@layout/item_message_user" />
+        <include layout="@layout/item_message_bot" />
+
+        <!-- 你以后可以用 RecyclerView 替换整个 LinearLayout 和 ScrollView -->
+    </LinearLayout>
+
+</ScrollView>
