@@ -24,10 +24,10 @@ import java.util.concurrent.TimeUnit
 
 class MainActivity : AppCompatActivity() {
 
-    // 你的 DeepSeek API Key（这里用真 Key，但代码中不展示完整信息，你复制时填你自己的）
+    // DeepSeek API Key（已内置，但建议你重置并换新）
     private val apiKey = "sk-cfe77eee81e7467a819fa12da293febf"
 
-    // DeepSeek 的接口地址（完全兼容 OpenAI 格式）
+    // DeepSeek 接口地址
     private val baseUrl = "https://api.deepseek.com"
     private val modelName = "deepseek-chat"
 
@@ -113,7 +113,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun handleUserMessage(text: String) {
-        // 保存用户消息到数据库和界面
         val userMsg = MessageEntity(text = text, isUser = true)
         lifecycleScope.launch { db.messageDao().insertMessage(userMsg) }
         adapter.messages.add(Message(text, true))
@@ -160,14 +159,14 @@ class MainActivity : AppCompatActivity() {
                     put("content", userMessage)
                 })
 
-                // 4. 构建请求体
+                // 4. 请求体
                 val requestBody = JSONObject().apply {
                     put("model", modelName)
                     put("messages", messagesArray)
                     put("temperature", 0.7)
                 }
 
-                // 5. 发送 HTTP POST 请求
+                // 5. HTTP POST
                 val mediaType = "application/json; charset=utf-8".toMediaType()
                 val body = requestBody.toString().toRequestBody(mediaType)
                 val request = Request.Builder()
@@ -210,7 +209,7 @@ class MainActivity : AppCompatActivity() {
                     chatHistory.removeAt(0)
                 }
 
-                // 8. 刷新界面：替换“思考中”为真实回复
+                // 8. 刷新界面
                 withContext(Dispatchers.Main) {
                     adapter.messages.removeAt(loadingIndex)
                     adapter.notifyItemRemoved(loadingIndex)
