@@ -1,23 +1,91 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.constraintlayout.widget.ConstraintLayout 
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/main_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/background"
-    android:paddingTop="50dp"
-    android:paddingBottom="30dp">
+    android:fitsSystemWindows="true">
 
+    <!-- 快捷提问按钮区域 -->
+    <HorizontalScrollView
+        android:id="@+id/shortcut_scroll"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:scrollbars="none"
+        android:paddingStart="8dp"
+        android:paddingVertical="8dp"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <LinearLayout
+            android:id="@+id/shortcut_container"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal" />
+    </HorizontalScrollView>
+
+    <!-- 聊天消息列表 -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/recycler_view"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:paddingHorizontal="8dp"
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp"
+        android:clipToPadding="false"
+        app:layout_constraintTop_toBottomOf="@id/shortcut_scroll"
+        app:layout_constraintBottom_toTopOf="@id/input_barrier"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <!-- 分隔线 -->
+    <View
+        android:id="@+id/input_barrier"
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="@color/divider"
+        app:layout_constraintBottom_toTopOf="@id/input_layout" />
+
+    <!-- 底部输入区 -->
     <LinearLayout
+        android:id="@+id/input_layout"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical">
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:background="@color/background"
+        android:paddingHorizontal="12dp"
+        android:paddingVertical="10dp"
+        app:layout_constraintBottom_toBottomOf="parent">
 
-        <!-- 这里模仿几条对话，方便你预览效果 -->
-        <include layout="@layout/item_message_user" />
-        <include layout="@layout/item_message_bot" />
-        <include layout="@layout/item_message_user" />
-        <include layout="@layout/item_message_bot" />
+        <EditText
+            android:id="@+id/message_input"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:background="@drawable/input_bg"
+            android:hint="输入消息..."
+            android:textColor="@color/on_background"
+            android:textColorHint="@color/disabled"
+            android:textSize="15sp"
+            android:paddingHorizontal="16dp"
+            android:paddingVertical="10dp"
+            android:maxLines="4"
+            android:inputType="textCapSentences|textMultiLine" />
 
-        <!-- 你以后可以用 RecyclerView 替换整个 LinearLayout 和 ScrollView -->
+        <ImageButton
+            android:id="@+id/send_button"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_marginStart="8dp"
+            android:background="@drawable/send_button_bg"
+            android:src="?attr/actionSearch"
+            android:contentDescription="发送"
+            android:tint="@color/on_primary" />
+
     </LinearLayout>
 
-</ScrollView>
+</androidx.constraintlayout.widget.ConstraintLayout>
