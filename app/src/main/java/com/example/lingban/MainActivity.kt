@@ -15,8 +15,30 @@ import androidx.recyclerview.widget.RecyclerView
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import okhttp3.*
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONArray
+import org.json.JSONObject
+import java.util.concurrent.TimeUnit
 
 class MainActivity : AppCompatActivity() {
+
+    // 你的 DeepSeek API Key（这里用真 Key，但代码中不展示完整信息，你复制时填你自己的）
+    private val apiKey = "sk-cfe77eee81e7467a819fa12da293febf"
+
+    // DeepSeek 的接口地址（完全兼容 OpenAI 格式）
+    private val baseUrl = "https://api.deepseek.com"
+    private val modelName = "deepseek-chat"
+
+    private val client by lazy {
+        OkHttpClient.Builder()
+            .connectTimeout(30, TimeUnit.SECONDS)
+            .readTimeout(30, TimeUnit.SECONDS)
+            .build()
+    }
+
+    private val chatHistory = mutableListOf<JSONObject>()
 
     private lateinit var recyclerView: RecyclerView
     private lateinit var adapter: MessageAdapter
@@ -24,8 +46,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var sendButton: ImageButton
     private lateinit var db: AppDatabase
     private lateinit var shortcutContainer: LinearLayout
-
-    // 偏好存储
     private val prefs by lazy { getSharedPreferences("user_prefs", Context.MODE_PRIVATE) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -93,34 +113,125 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun handleUserMessage(text: String) {
+        // 保存用户消息到数据库和界面
         val userMsg = MessageEntity(text = text, isUser = true)
         lifecycleScope.launch { db.messageDao().insertMessage(userMsg) }
         adapter.messages.add(Message(text, true))
         adapter.notifyItemInserted(adapter.messages.size - 1)
         recyclerView.scrollToPosition(adapter.messages.size - 1)
 
-        // 偏好识别与持久化
         if (text.contains("记住") || text.startsWith("偏好")) {
             prefs.edit().putString("preference", text).apply()
             addBotMessage("已记住你的偏好：$text")
         } else {
-            addBotMessage(generateResponse(text))
+            askDeepSeek(text)
         }
     }
 
-    private fun generateResponse(input: String): String {
-        val preference = prefs.getString("preference", "") ?: ""
-        return when {
-            preference.contains("简洁") -> "好的。"
-            preference.contains("专业") -> "收到，我会以专业的角度处理您的请求。"
-            preference.contains("温柔") -> "嗯嗯，我知道了～ 放心吧 😊"
-            else -> "这是一个模拟回复：你说的是“$input”"
+    private fun askDeepSeek(userMessage: String) {
+        addBotMessage("思考中...")
+        val loadingIndex = adapter.messages.size - 1
+
+        lifecycleScope.launch {
+            try {
+                // 1. 构建 messages 数组
+                val messagesArray = JSONArray()
+
+                // 系统提示（包含偏好）
+                val preference = prefs.getString("preference", "") ?: ""
+                val systemPrompt = if (preference.isNotEmpty()) {
+                    "你是一个私人助手，用户的偏好是：$preference。请根据此偏好回复。"
+                } else {
+                    "你是一个贴心的私人助手。"
+                }
+                messagesArray.put(JSONObject().apply {
+                    put("role", "system")
+                    put("content", systemPrompt)
+                })
+
+                // 2. 添加上下文（最近 6 条历史）
+                for (msg in chatHistory.takeLast(6)) {
+                    messagesArray.put(msg)
+                }
+
+                // 3. 当前用户消息
+                messagesArray.put(JSONObject().apply {
+                    put("role", "user")
+                    put("content", userMessage)
+                })
+
+                // 4. 构建请求体
+                val requestBody = JSONObject().apply {
+                    put("model", modelName)
+                    put("messages", messagesArray)
+                    put("temperature", 0.7)
+                }
+
+                // 5. 发送 HTTP POST 请求
+                val mediaType = "application/json; charset=utf-8".toMediaType()
+                val body = requestBody.toString().toRequestBody(mediaType)
+                val request = Request.Builder()
+                    .url("$baseUrl/v1/chat/completions")
+                    .addHeader("Authorization", "Bearer $apiKey")
+                    .addHeader("Content-Type", "application/json")
+                    .post(body)
+                    .build()
+
+                val responseStr = withContext(Dispatchers.IO) {
+                    client.newCall(request).execute().use { response ->
+                        if (!response.isSuccessful) {
+                            throw Exception("服务器错误: ${response.code} ${response.body?.string()}")
+                        }
+                        response.body?.string() ?: throw Exception("响应为空")
+                    }
+                }
+
+                // 6. 解析响应
+                val jsonResponse = JSONObject(responseStr)
+                val choices = jsonResponse.getJSONArray("choices")
+                val reply = if (choices.length() > 0) {
+                    choices.getJSONObject(0)
+                        .getJSONObject("message")
+                        .getString("content")
+                } else {
+                    "抱歉，我没有得到回复。"
+                }
+
+                // 7. 更新对话历史
+                chatHistory.add(JSONObject().apply {
+                    put("role", "user")
+                    put("content", userMessage)
+                })
+                chatHistory.add(JSONObject().apply {
+                    put("role", "assistant")
+                    put("content", reply)
+                })
+                if (chatHistory.size > 20) {
+                    chatHistory.removeAt(0)
+                }
+
+                // 8. 刷新界面：替换“思考中”为真实回复
+                withContext(Dispatchers.Main) {
+                    adapter.messages.removeAt(loadingIndex)
+                    adapter.notifyItemRemoved(loadingIndex)
+                    addBotMessage(reply)
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    if (adapter.messages.size > loadingIndex) {
+                        adapter.messages.removeAt(loadingIndex)
+                        adapter.notifyItemRemoved(loadingIndex)
+                    }
+                    addBotMessage("出错啦：${e.message}")
+                }
+            }
         }
     }
 
     private fun addBotMessage(text: String) {
         lifecycleScope.launch {
-            db.messageDao().insertMessage(MessageEntity(text = text, isUser = false))
+            val botMsg = MessageEntity(text = text, isUser = false)
+            db.messageDao().insertMessage(botMsg)
             withContext(Dispatchers.Main) {
                 adapter.messages.add(Message(text, false))
                 adapter.notifyItemInserted(adapter.messages.size - 1)
