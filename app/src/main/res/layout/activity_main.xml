@@ -82,7 +82,7 @@
             android:layout_height="48dp"
             android:layout_marginStart="8dp"
             android:background="@drawable/send_button_bg"
-            android:src="?attr/actionSearch"
+            android:src="@drawable/ic_send"
             android:contentDescription="发送"
             android:tint="@color/on_primary" />
 
