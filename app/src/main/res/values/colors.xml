@@ -1,10 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="purple_200">#FFBB86FC</color>
-    <color name="purple_500">#FF6200EE</color>
-    <color name="purple_700">#FF3700B3</color>
-    <color name="teal_200">#FF03DAC5</color>
-    <color name="teal_700">#FF018786</color>
-    <color name="black">#FF000000</color>
-    <color name="white">#FFFFFFFF</color>
+    <!-- 主色调：苹果经典蓝（亦可叫 “iOS Blue”） -->
+    <color name="primary">#007AFF</color>
+    <color name="primary_dark">#0062CC</color>
+    <color name="on_primary">#FFFFFF</color>
+
+    <!-- 页面背景：纯白，内容至上 -->
+    <color name="background">#FFFFFF</color>
+    <color name="on_background">#1C1C1E</color>   <!-- 接近纯黑的正文色 -->
+
+    <!-- 次级背景：极浅灰，用于卡片、输入框等 -->
+    <color name="surface">#F2F2F7</color>          <!-- iOS 系统浅灰背景 -->
+    <color name="on_surface">#3C3C43</color>       <!-- 次级文字，深灰但柔和 -->
+
+    <!-- 错误与提示（保留） -->
+    <color name="error">#FF3B30</color>
+    <color name="on_error">#FFFFFF</color>
+
+    <!-- 额外的中性色备用 -->
+    <color name="divider">#E5E5EA</color>          <!-- 分割线，很淡 -->
+    <color name="disabled">#C7C7CC</color>         <!-- 禁用元素 -->
 </resources>
