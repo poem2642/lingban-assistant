@@ -7,7 +7,6 @@ import android.widget.EditText
 import android.widget.ImageButton
 import android.widget.LinearLayout
 import android.widget.TextView
-import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
@@ -27,6 +26,7 @@ import java.util.concurrent.TimeUnit
 
 class MainActivity : AppCompatActivity() {
 
+    // DeepSeek API Key（已内置）
     private val apiKey = "sk-cfe77eee81e7467a819fa12da293febf"
     private val baseUrl = "https://api.deepseek.com"
     private val modelName = "deepseek-chat"
@@ -45,6 +45,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var db: AppDatabase
     private lateinit var shortcutContainer: LinearLayout
     private val prefs by lazy { getSharedPreferences("user_prefs", Context.MODE_PRIVATE) }
+
+    // 对话历史（已持久化到 SharedPreferences）
     private val chatHistory = mutableListOf<JSONObject>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -64,7 +66,7 @@ class MainActivity : AppCompatActivity() {
         setupSendButton()
         setupShortcuts()
         loadHistory()
-        loadChatContext()
+        loadChatContext()    // 恢复保存的对话历史
     }
 
     private fun initViews() {
@@ -79,7 +81,7 @@ class MainActivity : AppCompatActivity() {
         recyclerView.layoutManager = LinearLayoutManager(this)
         recyclerView.adapter = adapter
 
-        // 长按删除
+        // 长按删除消息
         adapter.setOnItemLongClickListener { position ->
             AlertDialog.Builder(this)
                 .setTitle("删除消息")
@@ -110,7 +112,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun setupShortcuts() {
         val shortcuts = mutableListOf(
-            "社交助手" to "open_social",  // 新增按钮，功能跳转
+            "社交助手" to "open_social",           // 跳转社交助手页面
             "回复简洁一点" to "记住我喜欢简洁的回复风格",
             "专业模式" to "记住我偏好正式、专业的语气",
             "温柔一点" to "记住我喜欢温柔、关心的语气",
@@ -126,7 +128,6 @@ class MainActivity : AppCompatActivity() {
                 textSize = 13f
                 setOnClickListener {
                     if (action == "open_social") {
-                        // 跳转到社交助手
                         startActivity(Intent(this@MainActivity, SocialActivity::class.java))
                     } else {
                         messageInput.setText(label)
@@ -142,6 +143,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun handleUserMessage(text: String) {
+        // 保存用户消息到数据库
         val userMsg = MessageEntity(text = text, isUser = true)
         lifecycleScope.launch {
             val id = db.messageDao().insertMessage(userMsg)
@@ -167,6 +169,8 @@ class MainActivity : AppCompatActivity() {
         lifecycleScope.launch {
             try {
                 val messagesArray = JSONArray()
+
+                // 系统提示
                 val preference = prefs.getString("preference", "") ?: ""
                 val systemPrompt = if (preference.isNotEmpty()) {
                     "你是一个私人助手，用户的偏好是：$preference。请根据此偏好回复。"
@@ -178,10 +182,12 @@ class MainActivity : AppCompatActivity() {
                     put("content", systemPrompt)
                 })
 
+                // 添加最近几轮对话历史
                 for (msg in chatHistory.takeLast(6)) {
                     messagesArray.put(msg)
                 }
 
+                // 当前用户消息
                 messagesArray.put(JSONObject().apply {
                     put("role", "user")
                     put("content", userMessage)
@@ -221,6 +227,7 @@ class MainActivity : AppCompatActivity() {
                     "抱歉，我没有得到回复。"
                 }
 
+                // 更新对话历史并持久化
                 chatHistory.add(JSONObject().apply {
                     put("role", "user")
                     put("content", userMessage)
@@ -234,6 +241,7 @@ class MainActivity : AppCompatActivity() {
                 }
                 saveChatContext()
 
+                // 替换加载提示为真实回复
                 withContext(Dispatchers.Main) {
                     adapter.messages.removeAt(loadingIndex)
                     adapter.notifyItemRemoved(loadingIndex)
@@ -276,6 +284,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    // ---------- 记忆持久化核心 ----------
     private fun saveChatContext() {
         val jsonArray = JSONArray()
         for (msg in chatHistory.takeLast(10)) {
