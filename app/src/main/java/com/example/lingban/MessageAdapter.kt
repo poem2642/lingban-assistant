@@ -9,6 +9,12 @@ import androidx.recyclerview.widget.RecyclerView
 class MessageAdapter(val messages: MutableList<Message>) :
     RecyclerView.Adapter<MessageAdapter.MessageViewHolder>() {
 
+    private var onItemLongClickListener: ((Int) -> Unit)? = null
+
+    fun setOnItemLongClickListener(listener: (Int) -> Unit) {
+        onItemLongClickListener = listener
+    }
+
     override fun getItemViewType(position: Int): Int {
         return if (messages[position].isUser) 0 else 1
     }
@@ -25,6 +31,10 @@ class MessageAdapter(val messages: MutableList<Message>) :
 
     override fun onBindViewHolder(holder: MessageViewHolder, position: Int) {
         holder.bind(messages[position])
+        holder.itemView.setOnLongClickListener {
+            onItemLongClickListener?.invoke(holder.adapterPosition)
+            true
+        }
     }
 
     override fun getItemCount(): Int = messages.size
