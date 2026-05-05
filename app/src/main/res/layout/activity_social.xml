@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/background"
+    android:padding="16dp">
+
+    <!-- 顶部标题 -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="社交回复助手"
+        android:textSize="20sp"
+        android:textColor="@color/on_background"
+        android:layout_marginBottom="16dp"
+        android:fontFamily="sans-serif-medium"/>
+
+    <!-- 输入框：粘贴对方发来的消息 -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="粘贴收到的消息："
+        android:textSize="14sp"
+        android:textColor="@color/on_surface"
+        android:layout_marginBottom="8dp"/>
+    <EditText
+        android:id="@+id/input_message"
+        android:layout_width="match_parent"
+        android:layout_height="120dp"
+        android:gravity="top"
+        android:background="@drawable/input_bg"
+        android:hint="例：你今天能把方案发我吗？"
+        android:textColor="@color/on_background"
+        android:textColorHint="@color/disabled"
+        android:textSize="15sp"
+        android:padding="12dp"
+        android:inputType="textMultiLine" />
+
+    <!-- 生成按钮 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginTop="12dp">
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1" />
+        <ImageButton
+            android:id="@+id/btn_generate"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="@drawable/send_button_bg"
+            android:src="@drawable/ic_send"
+            android:tint="@color/on_primary"
+            android:contentDescription="生成回复建议" />
+    </LinearLayout>
+
+    <!-- 结果显示区域 -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="回复建议："
+        android:textSize="14sp"
+        android:textColor="@color/on_surface"
+        android:layout_marginTop="16dp"
+        android:layout_marginBottom="8dp"/>
+    <HorizontalScrollView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:scrollbars="none">
+        <LinearLayout
+            android:id="@+id/reply_container"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal" />
+    </HorizontalScrollView>
+
+    <!-- 占位空间 -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+
+</LinearLayout>
