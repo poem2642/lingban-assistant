@@ -1,11 +1,14 @@
 package com.example.lingban
 
 import android.content.Context
+import android.content.Intent
 import android.os.Bundle
 import android.widget.EditText
 import android.widget.ImageButton
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
@@ -24,7 +27,6 @@ import java.util.concurrent.TimeUnit
 
 class MainActivity : AppCompatActivity() {
 
-    // DeepSeek API Key（已内置）
     private val apiKey = "sk-cfe77eee81e7467a819fa12da293febf"
     private val baseUrl = "https://api.deepseek.com"
     private val modelName = "deepseek-chat"
@@ -43,8 +45,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var db: AppDatabase
     private lateinit var shortcutContainer: LinearLayout
     private val prefs by lazy { getSharedPreferences("user_prefs", Context.MODE_PRIVATE) }
-
-    // 对话历史（已持久化）
     private val chatHistory = mutableListOf<JSONObject>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -64,7 +64,7 @@ class MainActivity : AppCompatActivity() {
         setupSendButton()
         setupShortcuts()
         loadHistory()
-        loadChatContext()    // 读取保存的对话历史
+        loadChatContext()
     }
 
     private fun initViews() {
@@ -78,6 +78,24 @@ class MainActivity : AppCompatActivity() {
         adapter = MessageAdapter(mutableListOf())
         recyclerView.layoutManager = LinearLayoutManager(this)
         recyclerView.adapter = adapter
+
+        // 长按删除
+        adapter.setOnItemLongClickListener { position ->
+            AlertDialog.Builder(this)
+                .setTitle("删除消息")
+                .setMessage("确定要删除这条消息吗？")
+                .setPositiveButton("删除") { _, _ ->
+                    val msg = adapter.messages[position]
+                    adapter.messages.removeAt(position)
+                    adapter.notifyItemRemoved(position)
+                    lifecycleScope.launch {
+                        db.messageDao().deleteMessage(msg.id)
+                    }
+                }
+                .setNegativeButton("取消", null)
+                .show()
+            true
+        }
     }
 
     private fun setupSendButton() {
@@ -91,18 +109,29 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupShortcuts() {
-        val shortcuts = listOf(
-            "回复简洁一点", "专业模式", "温柔一点", "恢复正常"
+        val shortcuts = mutableListOf(
+            "社交助手" to "open_social",  // 新增按钮，功能跳转
+            "回复简洁一点" to "记住我喜欢简洁的回复风格",
+            "专业模式" to "记住我偏好正式、专业的语气",
+            "温柔一点" to "记住我喜欢温柔、关心的语气",
+            "恢复正常" to "重置偏好，正常回复"
         )
         shortcutContainer.removeAllViews()
-        for (label in shortcuts) {
+        for ((label, action) in shortcuts) {
             val chip = TextView(this).apply {
                 text = label
                 setTextColor(getColor(R.color.on_surface))
                 setBackgroundResource(R.drawable.shortcut_chip_bg)
                 setPadding(24, 8, 24, 8)
                 textSize = 13f
-                setOnClickListener { messageInput.setText(label) }
+                setOnClickListener {
+                    if (action == "open_social") {
+                        // 跳转到社交助手
+                        startActivity(Intent(this@MainActivity, SocialActivity::class.java))
+                    } else {
+                        messageInput.setText(label)
+                    }
+                }
             }
             val params = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
@@ -113,15 +142,17 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun handleUserMessage(text: String) {
-        // 保存用户消息到数据库和界面
         val userMsg = MessageEntity(text = text, isUser = true)
-        lifecycleScope.launch { db.messageDao().insertMessage(userMsg) }
-        adapter.messages.add(Message(text, true))
-        adapter.notifyItemInserted(adapter.messages.size - 1)
-        recyclerView.scrollToPosition(adapter.messages.size - 1)
+        lifecycleScope.launch {
+            val id = db.messageDao().insertMessage(userMsg)
+            withContext(Dispatchers.Main) {
+                adapter.messages.add(Message(text, true, id))
+                adapter.notifyItemInserted(adapter.messages.size - 1)
+                recyclerView.scrollToPosition(adapter.messages.size - 1)
+            }
+        }
 
         if (text.contains("记住") || text.startsWith("偏好")) {
-            // 记住偏好（持久化）
             prefs.edit().putString("preference", text).apply()
             addBotMessage("已记住你的偏好：$text")
         } else {
@@ -135,10 +166,7 @@ class MainActivity : AppCompatActivity() {
 
         lifecycleScope.launch {
             try {
-                // 1. 构建 messages 数组
                 val messagesArray = JSONArray()
-
-                // 系统提示（包含偏好）
                 val preference = prefs.getString("preference", "") ?: ""
                 val systemPrompt = if (preference.isNotEmpty()) {
                     "你是一个私人助手，用户的偏好是：$preference。请根据此偏好回复。"
@@ -150,25 +178,21 @@ class MainActivity : AppCompatActivity() {
                     put("content", systemPrompt)
                 })
 
-                // 2. 添加上下文（最近 6 条持久化的历史）
                 for (msg in chatHistory.takeLast(6)) {
                     messagesArray.put(msg)
                 }
 
-                // 3. 当前用户消息
                 messagesArray.put(JSONObject().apply {
                     put("role", "user")
                     put("content", userMessage)
                 })
 
-                // 4. 请求体
                 val requestBody = JSONObject().apply {
                     put("model", modelName)
                     put("messages", messagesArray)
                     put("temperature", 0.7)
                 }
 
-                // 5. HTTP POST
                 val mediaType = "application/json; charset=utf-8".toMediaType()
                 val body = requestBody.toString().toRequestBody(mediaType)
                 val request = Request.Builder()
@@ -187,7 +211,6 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
 
-                // 6. 解析响应
                 val jsonResponse = JSONObject(responseStr)
                 val choices = jsonResponse.getJSONArray("choices")
                 val reply = if (choices.length() > 0) {
@@ -198,7 +221,6 @@ class MainActivity : AppCompatActivity() {
                     "抱歉，我没有得到回复。"
                 }
 
-                // 7. 更新对话历史（并持久化）
                 chatHistory.add(JSONObject().apply {
                     put("role", "user")
                     put("content", userMessage)
@@ -210,9 +232,8 @@ class MainActivity : AppCompatActivity() {
                 if (chatHistory.size > 20) {
                     chatHistory.removeAt(0)
                 }
-                saveChatContext()   // 持久化历史
+                saveChatContext()
 
-                // 8. 刷新界面
                 withContext(Dispatchers.Main) {
                     adapter.messages.removeAt(loadingIndex)
                     adapter.notifyItemRemoved(loadingIndex)
@@ -233,9 +254,9 @@ class MainActivity : AppCompatActivity() {
     private fun addBotMessage(text: String) {
         lifecycleScope.launch {
             val botMsg = MessageEntity(text = text, isUser = false)
-            db.messageDao().insertMessage(botMsg)
+            val id = db.messageDao().insertMessage(botMsg)
             withContext(Dispatchers.Main) {
-                adapter.messages.add(Message(text, false))
+                adapter.messages.add(Message(text, false, id))
                 adapter.notifyItemInserted(adapter.messages.size - 1)
                 recyclerView.scrollToPosition(adapter.messages.size - 1)
             }
@@ -245,7 +266,7 @@ class MainActivity : AppCompatActivity() {
     private fun loadHistory() {
         lifecycleScope.launch {
             val history = db.messageDao().getAllMessages()
-            val messages = history.map { Message(it.text, it.isUser) }.toMutableList()
+            val messages = history.map { Message(it.text, it.isUser, it.id) }.toMutableList()
             withContext(Dispatchers.Main) {
                 adapter.messages.clear()
                 adapter.messages.addAll(messages)
@@ -255,7 +276,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    // ---------- 记忆持久化核心 ----------
     private fun saveChatContext() {
         val jsonArray = JSONArray()
         for (msg in chatHistory.takeLast(10)) {
@@ -274,5 +294,4 @@ class MainActivity : AppCompatActivity() {
             }
         } catch (_: Exception) { }
     }
-    // ------------------------------------
 }
