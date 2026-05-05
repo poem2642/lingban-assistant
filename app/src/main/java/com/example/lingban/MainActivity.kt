@@ -24,10 +24,8 @@ import java.util.concurrent.TimeUnit
 
 class MainActivity : AppCompatActivity() {
 
-    // DeepSeek API Key（已内置，但建议你重置并换新）
+    // DeepSeek API Key（已内置）
     private val apiKey = "sk-cfe77eee81e7467a819fa12da293febf"
-
-    // DeepSeek 接口地址
     private val baseUrl = "https://api.deepseek.com"
     private val modelName = "deepseek-chat"
 
@@ -38,8 +36,6 @@ class MainActivity : AppCompatActivity() {
             .build()
     }
 
-    private val chatHistory = mutableListOf<JSONObject>()
-
     private lateinit var recyclerView: RecyclerView
     private lateinit var adapter: MessageAdapter
     private lateinit var messageInput: EditText
@@ -47,6 +43,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var db: AppDatabase
     private lateinit var shortcutContainer: LinearLayout
     private val prefs by lazy { getSharedPreferences("user_prefs", Context.MODE_PRIVATE) }
+
+    // 对话历史（已持久化）
+    private val chatHistory = mutableListOf<JSONObject>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         setTheme(R.style.Theme_LingBan)
@@ -65,6 +64,7 @@ class MainActivity : AppCompatActivity() {
         setupSendButton()
         setupShortcuts()
         loadHistory()
+        loadChatContext()    // 读取保存的对话历史
     }
 
     private fun initViews() {
@@ -113,6 +113,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun handleUserMessage(text: String) {
+        // 保存用户消息到数据库和界面
         val userMsg = MessageEntity(text = text, isUser = true)
         lifecycleScope.launch { db.messageDao().insertMessage(userMsg) }
         adapter.messages.add(Message(text, true))
@@ -120,6 +121,7 @@ class MainActivity : AppCompatActivity() {
         recyclerView.scrollToPosition(adapter.messages.size - 1)
 
         if (text.contains("记住") || text.startsWith("偏好")) {
+            // 记住偏好（持久化）
             prefs.edit().putString("preference", text).apply()
             addBotMessage("已记住你的偏好：$text")
         } else {
@@ -148,7 +150,7 @@ class MainActivity : AppCompatActivity() {
                     put("content", systemPrompt)
                 })
 
-                // 2. 添加上下文（最近 6 条历史）
+                // 2. 添加上下文（最近 6 条持久化的历史）
                 for (msg in chatHistory.takeLast(6)) {
                     messagesArray.put(msg)
                 }
@@ -179,7 +181,7 @@ class MainActivity : AppCompatActivity() {
                 val responseStr = withContext(Dispatchers.IO) {
                     client.newCall(request).execute().use { response ->
                         if (!response.isSuccessful) {
-                            throw Exception("服务器错误: ${response.code} ${response.body?.string()}")
+                            throw Exception("服务器错误: ${response.code}")
                         }
                         response.body?.string() ?: throw Exception("响应为空")
                     }
@@ -196,7 +198,7 @@ class MainActivity : AppCompatActivity() {
                     "抱歉，我没有得到回复。"
                 }
 
-                // 7. 更新对话历史
+                // 7. 更新对话历史（并持久化）
                 chatHistory.add(JSONObject().apply {
                     put("role", "user")
                     put("content", userMessage)
@@ -208,6 +210,7 @@ class MainActivity : AppCompatActivity() {
                 if (chatHistory.size > 20) {
                     chatHistory.removeAt(0)
                 }
+                saveChatContext()   // 持久化历史
 
                 // 8. 刷新界面
                 withContext(Dispatchers.Main) {
@@ -251,4 +254,25 @@ class MainActivity : AppCompatActivity() {
             }
         }
     }
+
+    // ---------- 记忆持久化核心 ----------
+    private fun saveChatContext() {
+        val jsonArray = JSONArray()
+        for (msg in chatHistory.takeLast(10)) {
+            jsonArray.put(msg)
+        }
+        prefs.edit().putString("chat_context", jsonArray.toString()).apply()
+    }
+
+    private fun loadChatContext() {
+        val saved = prefs.getString("chat_context", null) ?: return
+        try {
+            val jsonArray = JSONArray(saved)
+            chatHistory.clear()
+            for (i in 0 until jsonArray.length()) {
+                chatHistory.add(jsonArray.getJSONObject(i))
+            }
+        } catch (_: Exception) { }
+    }
+    // ------------------------------------
 }
