@@ -8,7 +8,7 @@
     android:background="@color/background"
     android:fitsSystemWindows="true">
 
-    <!-- 快捷提问按钮区域 -->
+    <!-- 快捷提问按钮区域（包含原有的四个 + 社交助手入口） -->
     <HorizontalScrollView
         android:id="@+id/shortcut_scroll"
         android:layout_width="0dp"
